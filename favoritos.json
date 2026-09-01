@@ -1,0 +1,16 @@
+{
+    "sv03-198": {
+        "nombre": "Gloom",
+        "imagen": "https://assets.tcgdex.net/es/sv/sv03/198/high.webp",
+        "precio_inicial": 28.0,
+        "fecha_inicial": "02/09/2026 00:26",
+        "precio_ultimo": 28.0,
+        "fecha_ultima": "02/09/2026 00:26",
+        "historial": [
+            {
+                "fecha": "02/09/2026 00:26",
+                "precio": 28.0
+            }
+        ]
+    }
+}
