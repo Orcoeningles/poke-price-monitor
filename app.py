@@ -67,7 +67,7 @@ def eliminar_de_favoritos(card_id):
 # -----------------------------------------------------------------------------
 @st.cache_data(ttl=3600)
 def obtener_top_20_tendencias_exactas():
-    """Extrae las 20 cartas exactas (nombre, set y precio) con mayor tendencia en Cardmarket."""
+    """Extrae las 20 cartas con mayor tendencia en Cardmarket."""
     url = "https://www.cardmarket.com/es/Pokemon/Products/Singles"
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
@@ -93,19 +93,34 @@ def obtener_top_20_tendencias_exactas():
                     top_cards.append({
                         "nombre": card_title,
                         "set": set_title,
-                        "precio": price_val,
-                        "search_term": f"{card_title} {set_title}".strip()
+                        "precio": price_val
                     })
     except Exception:
         pass
 
+    # Si falla por Cloudflare, cargamos una lista de respaldo ampliada a 20 cartas
     if not top_cards:
         top_cards = [
-            {"nombre": "Charizard ex", "set": "Obsidian Flames", "precio": "12.50 €", "search_term": "Charizard ex Obsidian Flames"},
-            {"nombre": "Pikachu ex", "set": "Surging Sparks", "precio": "25.00 €", "search_term": "Pikachu ex Surging Sparks"},
-            {"nombre": "Mewtwo ex", "set": "151", "precio": "8.00 €", "search_term": "Mewtwo ex 151"},
-            {"nombre": "Umbreon VMAX", "set": "Evolving Skies", "precio": "650.00 €", "search_term": "Umbreon VMAX Evolving Skies"},
-            {"nombre": "Gengar ex", "set": "Temporal Forces", "precio": "15.00 €", "search_term": "Gengar ex Temporal Forces"}
+            {"nombre": "Charizard ex", "set": "Obsidian Flames", "precio": "12.50 €"},
+            {"nombre": "Pikachu ex", "set": "Surging Sparks", "precio": "25.00 €"},
+            {"nombre": "Mewtwo ex", "set": "151", "precio": "8.00 €"},
+            {"nombre": "Umbreon VMAX", "set": "Evolving Skies", "precio": "650.00 €"},
+            {"nombre": "Gengar ex", "set": "Temporal Forces", "precio": "15.00 €"},
+            {"nombre": "Gardevoir ex", "set": "Paldean Fates", "precio": "18.00 €"},
+            {"nombre": "Iono", "set": "Paldea Evolved", "precio": "35.00 €"},
+            {"nombre": "Lugia V", "set": "Silver Tempest", "precio": "180.00 €"},
+            {"nombre": "Giratina V", "set": "Lost Origin", "precio": "240.00 €"},
+            {"nombre": "Rayquaza VMAX", "set": "Evolving Skies", "precio": "300.00 €"},
+            {"nombre": "Bulbasaur", "set": "151", "precio": "22.00 €"},
+            {"nombre": "Squirtle", "set": "151", "precio": "25.00 €"},
+            {"nombre": "Charmander", "set": "151", "precio": "30.00 €"},
+            {"nombre": "Blastoise ex", "set": "151", "precio": "45.00 €"},
+            {"nombre": "Venusaur ex", "set": "151", "precio": "40.00 €"},
+            {"nombre": "Eevee", "set": "Twilight Masquerade", "precio": "48.00 €"},
+            {"nombre": "Snorlax", "set": "151", "precio": "15.00 €"},
+            {"nombre": "Arceus VSTAR", "set": "Crown Zenith", "precio": "65.00 €"},
+            {"nombre": "Miriam", "set": "Scarlet & Violet", "precio": "32.00 €"},
+            {"nombre": "Lillie", "set": "Ultra Prism", "precio": "120.00 €"}
         ]
     return top_cards
 
@@ -180,11 +195,12 @@ def get_spanish_nm_price(card_name, card_number):
 
 # -----------------------------------------------------------------------------
 # -----------------------------------------------------------------------------
-# BARRA LATERAL (SIDEBAR): TOP 20 TENDENCIAS EXACTAS
+# -----------------------------------------------------------------------------
+# BARRA LATERAL (SIDEBAR): TOP 20 TENDENCIAS
 # -----------------------------------------------------------------------------
 with st.sidebar:
-    st.header("🔥 Top 20 Exacto")
-    st.caption("Impresiones específicas más vendidas")
+    st.header("🔥 Top 20 Tendencias")
+    st.caption("Impresiones más populares")
     
     top_20 = obtener_top_20_tendencias_exactas()
     
@@ -195,7 +211,8 @@ with st.sidebar:
             
         with st.container():
             if st.button(label, key=f"top_exact_{idx}"):
-                st.session_state["search_input"] = item["search_term"]
+                # Enviamos solo el nombre del Pokémon/carta para que la API no falle
+                st.session_state["search_input"] = item["nombre"]
                 st.rerun()
             st.caption(f"💰 Precio tendencia: **{item['precio']}**")
             st.divider()
