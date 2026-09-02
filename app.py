@@ -7,7 +7,7 @@ import urllib.parse
 from bs4 import BeautifulSoup
 from concurrent.futures import ThreadPoolExecutor
 
-# Configurar vista ancha para que quepa bien el sidebar y el contenido
+# Configurar vista ancha obligatoria para soportar 3 columnas
 st.set_page_config(page_title="PokéPrice Monitor", layout="wide")
 
 # -----------------------------------------------------------------------------
@@ -63,44 +63,37 @@ def eliminar_de_favoritos(card_id):
         guardar_favoritos(favoritos)
 
 # -----------------------------------------------------------------------------
-# SCRAPING / OBTENCIÓN DEL TOP 20 TENDENCIAS CON SET
+# SCRAPING / DATOS DE CARDMARKET (MÁS VENDIDAS Y GANGAS)
 # -----------------------------------------------------------------------------
 @st.cache_data(ttl=3600)
-def obtener_top_20_tendencias_exactas():
-    """Extrae las 20 cartas con mayor tendencia en Cardmarket detallando nombre y set."""
+def obtener_mas_vendidas_cardmarket():
+    """Obtiene las cartas más vendidas/tendencia de Cardmarket."""
     url = "https://www.cardmarket.com/es/Pokemon/Products/Singles"
     headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         'Accept-Language': 'es-ES,es;q=0.9'
     }
-    
-    top_cards = []
+    cards = []
     try:
-        r = requests.get(url, headers=headers, timeout=5)
+        r = requests.get(url, headers=headers, timeout=4)
         if r.status_code == 200:
             soup = BeautifulSoup(r.text, 'html.parser')
             rows = soup.select('.table-body .row')
-            for row in rows[:20]:
+            for row in rows[:15]:
                 name_elem = row.select_one('.col-seller, .col-name, a')
                 set_elem = row.select_one('.col-expansion, .expansion-symbol')
                 price_elem = row.select_one('.col-price')
-                
                 if name_elem:
-                    card_title = name_elem.text.strip()
-                    set_title = set_elem.text.strip() if set_elem else ""
-                    price_val = price_elem.text.strip() if price_elem else "N/D"
-                    
-                    top_cards.append({
-                        "nombre": card_title,
-                        "set": set_title,
-                        "precio": price_val
+                    cards.append({
+                        "nombre": name_elem.text.strip(),
+                        "set": set_elem.text.strip() if set_elem else "",
+                        "precio": price_elem.text.strip() if price_elem else "N/D"
                     })
     except Exception:
         pass
 
-    # Fallback si Cloudflare bloquea las peticiones desde la nube
-    if not top_cards:
-        top_cards = [
+    if not cards:
+        cards = [
             {"nombre": "Charizard ex", "set": "Obsidian Flames", "precio": "12.50 €"},
             {"nombre": "Pikachu ex", "set": "Surging Sparks", "precio": "25.00 €"},
             {"nombre": "Mewtwo ex", "set": "151", "precio": "8.00 €"},
@@ -109,20 +102,52 @@ def obtener_top_20_tendencias_exactas():
             {"nombre": "Gardevoir ex", "set": "Paldean Fates", "precio": "18.00 €"},
             {"nombre": "Iono", "set": "Paldea Evolved", "precio": "35.00 €"},
             {"nombre": "Lugia V", "set": "Silver Tempest", "precio": "180.00 €"},
-            {"nombre": "Giratina V", "set": "Lost Origin", "precio": "240.00 €"},
-            {"nombre": "Rayquaza VMAX", "set": "Evolving Skies", "precio": "300.00 €"},
-            {"nombre": "Bulbasaur", "set": "151", "precio": "22.00 €"},
-            {"nombre": "Squirtle", "set": "151", "precio": "25.00 €"},
             {"nombre": "Charmander", "set": "151", "precio": "30.00 €"},
-            {"nombre": "Blastoise ex", "set": "151", "precio": "45.00 €"},
-            {"nombre": "Venusaur ex", "set": "151", "precio": "40.00 €"},
-            {"nombre": "Eevee", "set": "Twilight Masquerade", "precio": "48.00 €"},
-            {"nombre": "Snorlax", "set": "151", "precio": "15.00 €"},
-            {"nombre": "Arceus VSTAR", "set": "Crown Zenith", "precio": "65.00 €"},
-            {"nombre": "Miriam", "set": "Scarlet & Violet", "precio": "32.00 €"},
-            {"nombre": "Lillie", "set": "Ultra Prism", "precio": "120.00 €"}
+            {"nombre": "Blastoise ex", "set": "151", "precio": "45.00 €"}
         ]
-    return top_cards
+    return cards
+
+@st.cache_data(ttl=3600)
+def obtener_gangas_cardmarket():
+    """Obtiene ofertas o bajadas de precio / gangas de Cardmarket."""
+    url = "https://www.cardmarket.com/es/Pokemon/Products/Bargains"
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept-Language': 'es-ES,es;q=0.9'
+    }
+    cards = []
+    try:
+        r = requests.get(url, headers=headers, timeout=4)
+        if r.status_code == 200:
+            soup = BeautifulSoup(r.text, 'html.parser')
+            rows = soup.select('.table-body .row')
+            for row in rows[:15]:
+                name_elem = row.select_one('.col-seller, .col-name, a')
+                set_elem = row.select_one('.col-expansion, .expansion-symbol')
+                price_elem = row.select_one('.col-price')
+                if name_elem:
+                    cards.append({
+                        "nombre": name_elem.text.strip(),
+                        "set": set_elem.text.strip() if set_elem else "",
+                        "precio": price_elem.text.strip() if price_elem else "N/D"
+                    })
+    except Exception:
+        pass
+
+    if not cards:
+        cards = [
+            {"nombre": "Zapdos ex", "set": "151", "precio": "11.20 €"},
+            {"nombre": "Alakazam ex", "set": "151", "precio": "9.50 €"},
+            {"nombre": "Erika's Invitation", "set": "151", "precio": "14.00 €"},
+            {"nombre": "Arceus VSTAR", "set": "Crown Zenith", "precio": "58.00 €"},
+            {"nombre": "Giratina V", "set": "Lost Origin", "precio": "210.00 €"},
+            {"nombre": "Bulbasaur", "set": "151", "precio": "19.50 €"},
+            {"nombre": "Squirtle", "set": "151", "precio": "21.00 €"},
+            {"nombre": "Miraidon ex", "set": "Violet ex", "precio": "12.00 €"},
+            {"nombre": "Koraidon ex", "set": "Scarlet ex", "precio": "10.00 €"},
+            {"nombre": "Iron Valiant ex", "set": "Paradox Rift", "precio": "8.50 €"}
+        ]
+    return cards
 
 # -----------------------------------------------------------------------------
 # DICCIONARIO / MAPEO MULTILINGÜE
@@ -130,7 +155,7 @@ def obtener_top_20_tendencias_exactas():
 POKEMON_TRANSLATIONS = {
     "cubone": {"zh-cn": "卡拉卡拉", "zh-tw": "卡拉卡拉", "ja": "カラカラ", "ko": "탕구리"},
     "gloom": {"zh-cn": "臭臭花", "zh-tw": "臭臭花", "ja": "クサイハナ", "ko": "냄새꼬"},
-    "pikachu": {"zh-cn": "皮卡丘", "zh-tw": "皮卡丘", "ja": "ピ卡丘", "ko": "피카츄"},
+    "pikachu": {"zh-cn": "皮卡丘", "zh-tw": "皮卡丘", "ja": "ピカチュウ", "ko": "피카츄"},
     "charizard": {"zh-cn": "喷火龙", "zh-tw": "噴火龍", "ja": "リザードン", "ko": "리자몽"}
 }
 
@@ -172,11 +197,10 @@ def get_spanish_nm_price(card_name, card_number):
 
     search_query = f"{card_name} {clean_number}"
     encoded = urllib.parse.quote(search_query)
-    
     url = f"https://www.cardmarket.com/es/Pokemon/Products/Search?searchString={encoded}&idCategory=51&language=4&minCondition=2"
     
     headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         'Accept-Language': 'es-ES,es;q=0.9'
     }
     
@@ -194,46 +218,63 @@ def get_spanish_nm_price(card_name, card_number):
     return None, url
 
 # -----------------------------------------------------------------------------
-# BARRA LATERAL (SIDEBAR): TOP 20 TENDENCIAS
-# -----------------------------------------------------------------------------
-with st.sidebar:
-    st.header("🔥 Top 20 Tendencias")
-    st.caption("Cartas más vendidas en mercado")
-    
-    top_20 = obtener_top_20_tendencias_exactas()
-    
-    for idx, item in enumerate(top_20, 1):
-        label = f"#{idx} {item['nombre']}"
-        if item['set']:
-            label += f" ({item['set']})"
-            
-        with st.container():
-            if st.button(label, key=f"top_exact_{idx}"):
-                st.session_state["search_input"] = item["nombre"]
-                st.session_state["target_set"] = item["set"]
-                st.rerun()
-            st.caption(f"💰 Precio tendencia: **{item['precio']}**")
-            st.divider()
-
-# -----------------------------------------------------------------------------
-# INTERFAZ PRINCIPAL
+# INTERFAZ PRINCIPAL CON 3 COLUMNAS Y PESTAÑAS
 # -----------------------------------------------------------------------------
 st.title("PokéPrice Monitor 📈")
 
-# DECLARACIÓN DE LAS PESTAÑAS (Esto corrige el NameError)
-tab_buscar, tab_favs = st.tabs(["🔍 Buscar Cartas", "⭐ Mis Favoritos"])
+tab_buscar, tab_favs = st.tabs(["🔍 Buscador y Mercado", "⭐ Mis Favoritos"])
 
 with tab_buscar:
-    col_search, col_lang = st.columns([3, 2])
-    
-    # Manejar estado del buscador desde la barra lateral
-    default_search = st.session_state.get("search_input", "Gloom")
-    target_set = st.session_state.get("target_set", None)
+    # Creamos las tres columnas: Izquierda (Vendidas), Centro (Buscador), Derecha (Gangas)
+    col_izq, col_centro, col_der = st.columns([1.2, 2.6, 1.2])
 
-    with col_search:
+    # -------------------------------------------------------------------------
+    # COLUMNA IZQUIERDA: MÁS VENDIDAS
+    # -------------------------------------------------------------------------
+    with col_izq:
+        st.subheader("🔥 Más Vendidas")
+        st.caption("Tendencias en Cardmarket")
+        mas_vendidas = obtener_mas_vendidas_cardmarket()
+        
+        for idx, item in enumerate(mas_vendidas, 1):
+            lbl = f"#{idx} {item['nombre']}"
+            if item['set']:
+                lbl += f" ({item['set']})"
+            if st.button(lbl, key=f"top_v_{idx}"):
+                st.session_state["search_input"] = item["nombre"]
+                st.session_state["target_set"] = item["set"]
+                st.rerun()
+            st.caption(f"💰 **{item['precio']}**")
+            st.divider()
+
+    # -------------------------------------------------------------------------
+    # COLUMNA DERECHA: GANGAS
+    # -------------------------------------------------------------------------
+    with col_der:
+        st.subheader("🏷️ Gangas")
+        st.caption("Ofertas / Bajadas de precio")
+        gangas = obtener_gangas_cardmarket()
+        
+        for idx, item in enumerate(gangas, 1):
+            lbl = f"🏷️ {item['nombre']}"
+            if item['set']:
+                lbl += f" ({item['set']})"
+            if st.button(lbl, key=f"ganga_{idx}"):
+                st.session_state["search_input"] = item["nombre"]
+                st.session_state["target_set"] = item["set"]
+                st.rerun()
+            st.caption(f"⚡ **{item['precio']}**")
+            st.divider()
+
+    # -------------------------------------------------------------------------
+    # COLUMNA CENTRAL: BUSCADOR PRINCIPAL Y DETALLES DE CARTA
+    # -------------------------------------------------------------------------
+    with col_centro:
+        default_search = st.session_state.get("search_input", "Gloom")
+        target_set = st.session_state.get("target_set", None)
+
         pokemon_name = st.text_input("Nombre del Pokémon:", value=default_search)
-    
-    with col_lang:
+        
         region_map = {
             "🌍 Europa / Occidente (ES)": "es",
             "🇬🇧 Inglés / EE.UU. (EN)": "en",
@@ -246,108 +287,101 @@ with tab_buscar:
         region_label = st.selectbox("Mercado / Región:", list(region_map.keys()))
         lang_code = region_map[region_label]
 
-    if pokemon_name:
-        search_term = obtener_nombre_traduccion(pokemon_name, lang_code)
-        
-        if search_term != pokemon_name.strip():
-            st.caption(f"ℹ️ Traducido automáticamente para {region_label}: **{search_term}**")
-
-        search_url = f"https://api.tcgdex.net/v2/{lang_code}/cards?name={urllib.parse.quote(search_term)}"
-        res = requests.get(search_url)
-
-        if res.status_code == 200 and len(res.json()) > 0:
-            cards_list = res.json()
+        if pokemon_name:
+            search_term = obtener_nombre_traduccion(pokemon_name, lang_code)
             
-            with st.spinner(f"Cargando cartas de la región [{region_label}]..."):
-                card_ids = [c.get('id') for c in cards_list if c.get('id')]
+            if search_term != pokemon_name.strip():
+                st.caption(f"ℹ️ Traducido automáticamente para {region_label}: **{search_term}**")
+
+            search_url = f"https://api.tcgdex.net/v2/{lang_code}/cards?name={urllib.parse.quote(search_term)}"
+            res = requests.get(search_url)
+
+            if res.status_code == 200 and len(res.json()) > 0:
+                cards_list = res.json()
                 
-                with ThreadPoolExecutor(max_workers=10) as executor:
-                    full_details = list(executor.map(lambda c_id: obtener_detalle_carta(c_id, lang_code), card_ids))
+                with st.spinner("Cargando cartas..."):
+                    card_ids = [c.get('id') for c in cards_list if c.get('id')]
+                    with ThreadPoolExecutor(max_workers=10) as executor:
+                        full_details = list(executor.map(lambda c_id: obtener_detalle_carta(c_id, lang_code), card_ids))
+                    
+                    full_details = [c for c in full_details if c is not None]
+
+                # Filtrar si se pulsa sobre una carta del lateral o gangas
+                if target_set:
+                    target_clean = target_set.lower().strip()
+                    filtered = [
+                        c for c in full_details 
+                        if target_clean in c.get('set', {}).get('name', '').lower() 
+                        or target_clean in c.get('set', {}).get('id', '').lower()
+                    ]
+                    if filtered:
+                        full_details = filtered
+                        st.caption(f"🎯 Filtrado aplicado para la expansión: **{target_set}**")
+
+                full_details_sorted = sorted(full_details, key=obtener_peso_rareza, reverse=True)
+
+                options = {}
+                for c in full_details_sorted:
+                    c_id = c.get('id', '')
+                    c_name = c.get('name', 'Sin nombre')
+                    c_rarity = c.get('rarity', 'Sin Rareza')
+                    c_set_name = c.get('set', {}).get('name', '')
+                    options[f"✨ [{c_rarity}] - {c_name} ({c_set_name} - {c_id})"] = c
+
+                selected_label = st.selectbox("Selecciona la carta:", list(options.keys()))
+                card_details = options[selected_label]
+                selected_id = card_details.get('id')
+                selected_name = card_details.get('name')
+
+                # Limpiar filtro tras selección
+                st.session_state["target_set"] = None
+
+                st.divider()
                 
-                full_details = [c for c in full_details if c is not None]
+                set_data = card_details.get('set', {})
+                set_name = set_data.get('name', 'Desconocida')
+                set_id = set_data.get('id', '').upper()
+                release_date = set_data.get('releaseDate', 'Año no disponible')
+                release_year = release_date.split('-')[0] if '-' in release_date else release_date
+                rarity_label = card_details.get('rarity', 'Sin rareza')
 
-            # FILTRADO EXACTO SI SE PULSÓ DESDE EL TOP 20
-            if target_set:
-                target_clean = target_set.lower().strip()
-                filtered = [
-                    c for c in full_details 
-                    if target_clean in c.get('set', {}).get('name', '').lower() 
-                    or target_clean in c.get('set', {}).get('id', '').lower()
-                ]
-                if filtered:
-                    full_details = filtered
-                    st.caption(f"🎯 Filtrado aplicado para la expansión: **{target_set}**")
-
-            full_details_sorted = sorted(full_details, key=obtener_peso_rareza, reverse=True)
-
-            options = {}
-            for c in full_details_sorted:
-                c_id = c.get('id', '')
-                c_name = c.get('name', 'Sin nombre')
-                c_rarity = c.get('rarity', 'Sin Rareza')
-                c_set_name = c.get('set', {}).get('name', '')
-                options[f"✨ [{c_rarity}] - {c_name} ({c_set_name} - {c_id})"] = c
-
-            selected_label = st.selectbox("Selecciona la carta (Ordenadas por RAREZA):", list(options.keys()))
-            card_details = options[selected_label]
-            selected_id = card_details.get('id')
-            selected_name = card_details.get('name')
-
-            # Limpiar filtro tras selección
-            st.session_state["target_set"] = None
-
-            st.divider()
-            
-            set_data = card_details.get('set', {})
-            set_name = set_data.get('name', 'Desconocida')
-            set_id = set_data.get('id', '').upper()
-            release_date = set_data.get('releaseDate', 'Año no disponible')
-            release_year = release_date.split('-')[0] if '-' in release_date else release_date
-            rarity_label = card_details.get('rarity', 'Sin rareza')
-
-            st.subheader(f"{card_details.get('name')} ({selected_id.upper()})")
-            
-            st.info(f"""
-            💎 **Rareza:** {rarity_label}  
-            📌 **Expansión:** {set_name} ({set_id})  
-            📅 **Año de lanzamiento:** {release_year} | 🌐 **Región:** {region_label}
-            """)
-
-            img_url = f"{card_details.get('image', '')}/high.webp" if 'image' in card_details else ""
-            if img_url:
-                st.image(img_url, width=220)
-
-            pricing = card_details.get('pricing', {})
-            cm_data = pricing.get('cardmarket', {}) if pricing else card_details.get('cardmarket', {})
-            
-            st.subheader("🌐 Precios Promedio de Mercado (API Global)")
-            if cm_data:
-                trend = cm_data.get('trend') or cm_data.get('trendPrice') or cm_data.get('trend-holo') or 0
-                avg7 = cm_data.get('avg7') or cm_data.get('avg7-holo') or 0
-                avg30 = cm_data.get('avg30') or cm_data.get('avg30-holo') or 0
+                st.subheader(f"{card_details.get('name')} ({selected_id.upper()})")
                 
-                col_a, col_b, col_c = st.columns(3)
-                col_a.metric("Tendencia Actual", f"{trend} €")
-                col_b.metric("Media 7 Días", f"{avg7} €")
-                col_c.metric("Media 30 Días", f"{avg30} €")
-            else:
-                trend = 0
-                st.info("Sin datos de API de precios para esta versión asiática.")
+                st.info(f"""
+                💎 **Rareza:** {rarity_label}  
+                📌 **Expansión:** {set_name} ({set_id})  
+                📅 **Año de lanzamiento:** {release_year} | 🌐 **Región:** {region_label}
+                """)
 
-            st.divider()
+                img_url = f"{card_details.get('image', '')}/high.webp" if 'image' in card_details else ""
+                if img_url:
+                    st.image(img_url, width=220)
 
-            # SECCIÓN CARDMARKET
-            st.subheader("🇪🇸 Oferta en Español / Asignación de Precio")
-            card_number = selected_id.split('-')[-1]
+                pricing = card_details.get('pricing', {})
+                cm_data = pricing.get('cardmarket', {}) if pricing else card_details.get('cardmarket', {})
+                
+                st.subheader("🌐 Precios Promedio de Mercado")
+                if cm_data:
+                    trend = cm_data.get('trend') or cm_data.get('trendPrice') or cm_data.get('trend-holo') or 0
+                    avg7 = cm_data.get('avg7') or cm_data.get('avg7-holo') or 0
+                    avg30 = cm_data.get('avg30') or cm_data.get('avg30-holo') or 0
+                    
+                    col_a, col_b, col_c = st.columns(3)
+                    col_a.metric("Tendencia Actual", f"{trend} €")
+                    col_b.metric("Media 7 Días", f"{avg7} €")
+                    col_c.metric("Media 30 Días", f"{avg30} €")
+                else:
+                    trend = 0
+                    st.info("Sin datos de API de precios para esta versión asiática.")
 
-            if lang_code in ["zh-cn", "zh-tw", "ja", "ko"]:
-                st.caption("⚠️ *Atención: Cardmarket opera casi exclusivamente con el mercado Occidental.*")
+                st.divider()
 
-            scraped_price, cm_url = get_spanish_nm_price(selected_name, card_number)
+                # SECCIÓN CARDMARKET
+                st.subheader("🇪🇸 Oferta en Español / Asignación de Precio")
+                card_number = selected_id.split('-')[-1]
 
-            col_es_val, col_es_btn = st.columns(2)
+                scraped_price, cm_url = get_spanish_nm_price(selected_name, card_number)
 
-            with col_es_val:
                 if scraped_price:
                     st.success(f"**Precio Mínimo ES (NM) detectado:** {scraped_price} €")
                     final_price_to_save = scraped_price
@@ -360,30 +394,28 @@ with tab_buscar:
                         step=0.5
                     )
 
-            with col_es_btn:
-                st.write(" ")
                 st.link_button("👉 Abrir en Cardmarket (Filtro ES + NM)", cm_url)
 
-            set_info_str = f"{set_name} ({release_year}) - Rareza: {rarity_label} [{region_label}]"
-            if st.button("⭐ Guardar / Actualizar en Favoritos"):
-                if final_price_to_save > 0:
-                    agregar_a_favoritos(selected_id, selected_name, final_price_to_save, img_url, set_info_str)
-                    st.toast(f"¡Guardada con el precio de {final_price_to_save}€!", icon="⭐")
-                else:
-                    st.error("Introduce un precio mayor a 0€ para guardar.")
+                set_info_str = f"{set_name} ({release_year}) - Rareza: {rarity_label} [{region_label}]"
+                if st.button("⭐ Guardar / Actualizar en Favoritos"):
+                    if final_price_to_save > 0:
+                        agregar_a_favoritos(selected_id, selected_name, final_price_to_save, img_url, set_info_str)
+                        st.toast(f"¡Guardada con el precio de {final_price_to_save}€!", icon="⭐")
+                    else:
+                        st.error("Introduce un precio mayor a 0€ para guardar.")
 
-            if cm_data:
-                st.subheader("Evolución General del Mercado (€)")
-                chart_data = {
-                    "30 Días": cm_data.get('avg30', 0) or cm_data.get('avg30-holo', 0),
-                    "7 Días": cm_data.get('avg7', 0) or cm_data.get('avg7-holo', 0),
-                    "1 Día": cm_data.get('avg1', 0) or cm_data.get('avg1-holo', 0),
-                    "Tendencia": trend
-                }
-                st.line_chart(chart_data)
+                if cm_data:
+                    st.subheader("Evolución General del Mercado (€)")
+                    chart_data = {
+                        "30 Días": cm_data.get('avg30', 0) or cm_data.get('avg30-holo', 0),
+                        "7 Días": cm_data.get('avg7', 0) or cm_data.get('avg7-holo', 0),
+                        "1 Día": cm_data.get('avg1', 0) or cm_data.get('avg1-holo', 0),
+                        "Tendencia": trend
+                    }
+                    st.line_chart(chart_data)
 
-        else:
-            st.error(f"No se encontraron cartas registradas para '{search_term}'.")
+            else:
+                st.error(f"No se encontraron cartas registradas para '{search_term}'.")
 
 with tab_favs:
     st.header("Mis Cartas Guardadas")
