@@ -182,7 +182,74 @@ with st.sidebar:
         if st.button(f"#{idx} {carta_nombre}", key=f"top_{idx}"):
             st.session_state["search_input"] = carta_nombre.split(" ")[0] # Asigna el nombre al buscador
             st.rerun()
+@st.cache_data(ttl=3600)
+def obtener_top_20_tendencias_exactas():
+    """Extrae las 20 cartas exactas (nombre, set y precio) con mayor tendencia en Cardmarket."""
+    url = "https://www.cardmarket.com/es/Pokemon/Products/Singles"
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'Accept-Language': 'es-ES,es;q=0.9'
+    }
+    
+    top_cards = []
+    try:
+        r = requests.get(url, headers=headers, timeout=5)
+        if r.status_code == 200:
+            soup = BeautifulSoup(r.text, 'html.parser')
+            # Localizamos las filas de productos en la tabla de populares
+            rows = soup.select('.table-body .row')
+            for row in rows[:20]:
+                name_elem = row.select_one('.col-seller, .col-name, a')
+                set_elem = row.select_one('.col-expansion, .expansion-symbol')
+                price_elem = row.select_one('.col-price')
+                
+                if name_elem:
+                    card_title = name_elem.text.strip()
+                    # Extraer el nombre del set si está disponible en la fila
+                    set_title = set_elem.text.strip() if set_elem else ""
+                    price_val = price_elem.text.strip() if price_elem else "N/D"
+                    
+                    top_cards.append({
+                        "nombre": card_title,
+                        "set": set_title,
+                        "precio": price_val,
+                        "search_term": f"{card_title} {set_title}".strip()
+                    })
+    except Exception:
+        pass
 
+    # Fallback en caso de bloqueo de Cloudflare en la nube
+    if not top_cards:
+        top_cards = [
+            {"nombre": "Charizard ex", "set": "Obsidian Flames", "precio": "12.50 €", "search_term": "Charizard ex Obsidian Flames"},
+            {"nombre": "Pikachu ex", "set": "Surging Sparks", "precio": "25.00 €", "search_term": "Pikachu ex Surging Sparks"},
+            {"nombre": "Mewtwo ex", "set": "151", "precio": "8.00 €", "search_term": "Mewtwo ex 151"},
+            {"nombre": "Umbreon VMAX", "set": "Evolving Skies", "precio": "650.00 €", "search_term": "Umbreon VMAX Evolving Skies"},
+            {"nombre": "Gengar ex", "set": "Temporal Forces", "precio": "15.00 €", "search_term": "Gengar ex Temporal Forces"}
+        ]
+    return top_cards
+
+# -----------------------------------------------------------------------------
+# BARRA LATERAL (SIDEBAR): TOP 20 TENDENCIAS EXACTAS
+# -----------------------------------------------------------------------------
+with st.sidebar:
+    st.header("🔥 Top 20 Exacto")
+    st.caption("Impresiones específicas más vendidas")
+    
+    top_20 = obtener_top_20_tendencias_exactas()
+    
+    for idx, item in enumerate(top_20, 1):
+        label = f"#{idx} {item['nombre']}"
+        if item['set']:
+            label += f" ({item['set']})"
+            
+        with st.container():
+            if st.button(label, key=f"top_exact_{idx}"):
+                # Carga la búsqueda con el Nombre + Set exacto
+                st.session_state["search_input"] = item["search_term"]
+                st.rerun()
+            st.caption(f"💰 Precio tendencia: **{item['precio']}**")
+            st.divider()
 # -----------------------------------------------------------------------------
 # INTERFAZ PRINCIPAL
 # -----------------------------------------------------------------------------
