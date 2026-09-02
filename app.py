@@ -7,6 +7,9 @@ import urllib.parse
 from bs4 import BeautifulSoup
 from concurrent.futures import ThreadPoolExecutor
 
+# Configurar vista ancha para que quepa bien el sidebar y el contenido
+st.set_page_config(page_title="PokéPrice Monitor", layout="wide")
+
 # -----------------------------------------------------------------------------
 # BASE DE DATOS LOCAL (JSON)
 # -----------------------------------------------------------------------------
@@ -60,12 +63,49 @@ def eliminar_de_favoritos(card_id):
         guardar_favoritos(favoritos)
 
 # -----------------------------------------------------------------------------
+# SCRAPING / OBTENCIÓN DEL TOP 20 MÁS VENDIDAS / TENDENCIAS
+# -----------------------------------------------------------------------------
+@st.cache_data(ttl=3600)  # Guarda la lista en caché durante 1 hora para rapidez
+def obtener_top_20_tendencias():
+    """Extrae las cartas más populares / con más volumen del mercado occidental."""
+    url = "https://www.cardmarket.com/es/Pokemon/Products/Singles"
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'Accept-Language': 'es-ES,es;q=0.9'
+    }
+    
+    top_cards = []
+    try:
+        r = requests.get(url, headers=headers, timeout=5)
+        if r.status_code == 200:
+            soup = BeautifulSoup(r.text, 'html.parser')
+            # Extraer los elementos del listado de sencillos más cotizados
+            items = soup.find_all("div", class_="row no-gutters my-2")
+            for item in items[:20]:
+                name_elem = item.find("a")
+                if name_elem:
+                    card_title = name_elem.text.strip()
+                    top_cards.append(card_title)
+    except Exception:
+        pass
+
+    # Si falla por bloqueo de Cloudflare en la nube, usamos un listado de respaldo
+    if not top_cards:
+        top_cards = [
+            "Charizard ex", "Pikachu ex", "Mewtwo ex", "Eevee", "Gengar",
+            "Umbreon", "Rayquaza", "Gardevoir ex", "Iono", "Lugia V",
+            "Giratina V", "Bulbasaur", "Squirtle", "Charmander", "Snorlax",
+            "Blastoise ex", "Venusaur ex", "Arceus VSTAR", "Miriam", "Lillie"
+        ]
+    return top_cards
+
+# -----------------------------------------------------------------------------
 # DICCIONARIO / MAPEO MULTILINGÜE
 # -----------------------------------------------------------------------------
 POKEMON_TRANSLATIONS = {
     "cubone": {"zh-cn": "卡拉卡拉", "zh-tw": "卡拉卡拉", "ja": "カラカラ", "ko": "탕구리"},
     "gloom": {"zh-cn": "臭臭花", "zh-tw": "臭臭花", "ja": "クサイハナ", "ko": "냄새꼬"},
-    "pikachu": {"zh-cn": "皮卡丘", "zh-tw": "皮卡丘", "ja": "ピカチュウ", "ko": "피卡丘"},
+    "pikachu": {"zh-cn": "皮卡丘", "zh-tw": "皮卡丘", "ja": "ピカチュウ", "ko": "皮卡丘"},
     "charizard": {"zh-cn": "喷火龙", "zh-tw": "噴火龍", "ja": "リザードン", "ko": "리자몽"}
 }
 
@@ -76,19 +116,12 @@ def obtener_nombre_traduccion(nombre_input, lang_code):
     return nombre_input
 
 # -----------------------------------------------------------------------------
-# MAPEADO COMPLETO Y CORREGIDO DE RAREZAS
+# RAREZA & APIS
 # -----------------------------------------------------------------------------
 RAREZA_ORDEN = {
     "corona": 100, "crown": 100, "hyper rare": 100, "rara hiper": 100, "secret rare": 100, "rara secreta": 100,
-    "tres estrellas": 90, "three stars": 90, "special illustration rare": 90, "ilustración especial rara": 90, "rara ilustración especial": 90,
-    "dos estrellas": 80, "two stars": 80, "illustration rare": 80, "ilustración rara": 80, "rara ilustración": 80, "shiny rare": 80, "rara variocolor": 80, "ar": 80, "sar": 90,
-    "una estrella": 70, "one star": 70, "ultra rare": 70, "ultra rara": 70, "rara ultra": 70, "shiny ultra rare": 70,
-    "cuatro diamantes": 60, "four diamonds": 60, "double rare": 60, "rara doble": 60,
-    "tres diamantes": 50, "three diamonds": 50, "rare holo": 50, "rara holo": 50,
-    "dos diamantes": 40, "two diamonds": 40, "rare": 40, "rara": 40,
-    "un diamante": 30, "one diamond": 30, "uncommon": 30, "poco común": 30, "poco comun": 30,
-    "common": 20, "común": 20, "comun": 20,
-    "none": 10, "sin rareza": 10
+    "tres estrellas": 90, "three stars": 90, "special illustration rare": 90, "illustration rare": 80,
+    "ultra rare": 70, "rara doble": 60, "rare holo": 50, "rare": 40, "uncommon": 30, "common": 20
 }
 
 def obtener_peso_rareza(card_detail):
@@ -107,20 +140,14 @@ def obtener_detalle_carta(card_id, lang_code):
         pass
     return None
 
-# -----------------------------------------------------------------------------
-# SCRAPING Y ENLACE CARDMARKET (CORREGIDO)
-# -----------------------------------------------------------------------------
 def get_spanish_nm_price(card_name, card_number):
-    # Extraemos solo los dígitos del número de la carta (ej. "sv03-198" -> "198")
     clean_number = card_number.split('/')[-1].split('-')[-1].lstrip('0')
     if not clean_number:
         clean_number = card_number
 
-    # Búsqueda limpia: "Nombre Número" (ej. "Gloom 198")
     search_query = f"{card_name} {clean_number}"
     encoded = urllib.parse.quote(search_query)
     
-    # idCategory=51 -> Cartas sueltas | language=4 -> Español | minCondition=2 -> NM
     url = f"https://www.cardmarket.com/es/Pokemon/Products/Search?searchString={encoded}&idCategory=51&language=4&minCondition=2"
     
     headers = {
@@ -142,7 +169,22 @@ def get_spanish_nm_price(card_name, card_number):
     return None, url
 
 # -----------------------------------------------------------------------------
-# INTERFAZ STREAMLIT
+# BARRA LATERAL (SIDEBAR): TOP 20 TENDENCIAS DE MERCADO
+# -----------------------------------------------------------------------------
+with st.sidebar:
+    st.header("🔥 Top 20 Tendencias")
+    st.caption("Cartas con mayor volumen de movimiento")
+    
+    top_20 = obtener_top_20_tendencias()
+    
+    # Creamos un botón o un identificador para cada una
+    for idx, carta_nombre in enumerate(top_20, 1):
+        if st.button(f"#{idx} {carta_nombre}", key=f"top_{idx}"):
+            st.session_state["search_input"] = carta_nombre.split(" ")[0] # Asigna el nombre al buscador
+            st.rerun()
+
+# -----------------------------------------------------------------------------
+# INTERFAZ PRINCIPAL
 # -----------------------------------------------------------------------------
 st.title("PokéPrice Monitor 📈")
 
@@ -151,8 +193,11 @@ tab_buscar, tab_favs = st.tabs(["🔍 Buscar Cartas", "⭐ Mis Favoritos"])
 with tab_buscar:
     col_search, col_lang = st.columns([3, 2])
     
+    # Manejar estado del buscador desde la barra lateral
+    default_search = st.session_state.get("search_input", "Gloom")
+
     with col_search:
-        pokemon_name = st.text_input("Nombre del Pokémon:", value="Gloom")
+        pokemon_name = st.text_input("Nombre del Pokémon:", value=default_search)
     
     with col_lang:
         region_map = {
@@ -241,14 +286,12 @@ with tab_buscar:
 
             st.divider()
 
-            # -----------------------------------------------------------------
-            # SECCIÓN CARDMARKET CORREGIDA
-            # -----------------------------------------------------------------
+            # SECCIÓN CARDMARKET
             st.subheader("🇪🇸 Oferta en Español / Asignación de Precio")
             card_number = selected_id.split('-')[-1]
 
             if lang_code in ["zh-cn", "zh-tw", "ja", "ko"]:
-                st.caption("⚠️ *Atención: Cardmarket solo opera con el mercado Occidental. Las cartas asiáticas no están listadas directamente.*")
+                st.caption("⚠️ *Atención: Cardmarket opera casi exclusivamente con el mercado Occidental.*")
 
             scraped_price, cm_url = get_spanish_nm_price(selected_name, card_number)
 
@@ -290,7 +333,7 @@ with tab_buscar:
                 st.line_chart(chart_data)
 
         else:
-            st.error(f"No se encontraron cartas registradas para '{search_term}' en la base de datos de {region_label}.")
+            st.error(f"No se encontraron cartas registradas para '{search_term}'.")
 
 with tab_favs:
     st.header("Mis Cartas Guardadas")
