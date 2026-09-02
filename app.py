@@ -63,11 +63,10 @@ def eliminar_de_favoritos(card_id):
         guardar_favoritos(favoritos)
 
 # -----------------------------------------------------------------------------
-# DATOS CON ID EXACTO (ILUSTRACIONES PRECISAS)
+# DATOS CON ID EXACTO (ILUSTRACIONES PRECISAS Y COMPATIBLES)
 # -----------------------------------------------------------------------------
 @st.cache_data(ttl=3600)
 def obtener_mas_vendidas_cardmarket():
-    """Obtiene las cartas más vendidas mapeando su ID exacto de la API."""
     return [
         {"nombre": "Charmander (Art Rare)", "set": "151", "precio": "30.00 €", "card_id": "sv3pt5-168"},
         {"nombre": "Charizard ex (Special Art)", "set": "151", "precio": "120.00 €", "card_id": "sv3pt5-199"},
@@ -83,7 +82,6 @@ def obtener_mas_vendidas_cardmarket():
 
 @st.cache_data(ttl=3600)
 def obtener_gangas_cardmarket():
-    """Obtiene oportunidades y bajadas de precio con ID exacto."""
     return [
         {"nombre": "Zapdos ex (Special Art)", "set": "151", "precio": "11.20 €", "card_id": "sv3pt5-202"},
         {"nombre": "Alakazam ex (Special Art)", "set": "151", "precio": "9.50 €", "card_id": "sv3pt5-201"},
@@ -125,12 +123,22 @@ def obtener_peso_rareza(card_detail):
     return 0
 
 def obtener_detalle_carta(card_id, lang_code):
+    """Consulta la carta y si falla o no existe en el idioma elegido, usa inglés de respaldo (Fallback)."""
     try:
-        res = requests.get(f"https://api.tcgdex.net/v2/{lang_code}/cards/{card_id}", timeout=5)
+        res = requests.get(f"https://api.tcgdex.net/v2/{lang_code}/cards/{card_id}", timeout=3)
         if res.status_code == 200:
             return res.json()
     except Exception:
         pass
+    
+    # Intento de respaldo en inglés si falla en español/asíatico
+    try:
+        res_en = requests.get(f"https://api.tcgdex.net/v2/en/cards/{card_id}", timeout=3)
+        if res_en.status_code == 200:
+            return res_en.json()
+    except Exception:
+        pass
+        
     return None
 
 def get_spanish_nm_price(card_name, card_number):
@@ -216,10 +224,14 @@ with tab_buscar:
 
         card_details = None
 
-        # A) Carga directa si se pulsa sobre una carta de los paneles laterales
+        # A) Carga directa con Fallback Anti-Bloqueos
         if direct_id:
-            st.caption(f"🎯 Cargando variante exacta seleccionada: **{direct_id.upper()}**")
-            card_details = obtener_detalle_carta(direct_id, lang_code)
+            with st.spinner("Cargando carta seleccionada..."):
+                card_details = obtener_detalle_carta(direct_id, lang_code)
+                
+            if not card_details:
+                st.error("No se pudo cargar esta variante en particular. Intenta volver al buscador.")
+            
             if st.button("🔄 Volver al buscador general"):
                 st.session_state["direct_card_id"] = None
                 st.rerun()
