@@ -63,34 +63,34 @@ def eliminar_de_favoritos(card_id):
         guardar_favoritos(favoritos)
 
 # -----------------------------------------------------------------------------
-# DATOS CON ID EXACTO (ILUSTRACIONES PRECISAS Y COMPATIBLES)
+# DATOS CON ID EXACTO (CORREGIDOS PARA SET 151)
 # -----------------------------------------------------------------------------
 @st.cache_data(ttl=3600)
 def obtener_mas_vendidas_cardmarket():
     return [
-        {"nombre": "Charmander (Art Rare)", "set": "151", "precio": "30.00 €", "card_id": "sv3pt5-168"},
-        {"nombre": "Charizard ex (Special Art)", "set": "151", "precio": "120.00 €", "card_id": "sv3pt5-199"},
+        {"nombre": "Charmander (Art Rare)", "set": "151", "precio": "30.00 €", "card_id": "me01-168"},
+        {"nombre": "Charizard ex (Special Art)", "set": "151", "precio": "120.00 €", "card_id": "me01-199"},
         {"nombre": "Pikachu ex", "set": "Surging Sparks", "precio": "25.00 €", "card_id": "sv08-057"},
-        {"nombre": "Mewtwo ex", "set": "151", "precio": "8.00 €", "card_id": "sv3pt5-183"},
+        {"nombre": "Mewtwo ex", "set": "151", "precio": "8.00 €", "card_id": "me01-183"},
         {"nombre": "Umbreon VMAX (Alt Art)", "set": "Evolving Skies", "precio": "650.00 €", "card_id": "swsh7-215"},
         {"nombre": "Gengar ex", "set": "Temporal Forces", "precio": "15.00 €", "card_id": "sv05-104"},
         {"nombre": "Gardevoir ex", "set": "Paldean Fates", "precio": "18.00 €", "card_id": "sv04.5-233"},
         {"nombre": "Iono (Special Art)", "set": "Paldea Evolved", "precio": "35.00 €", "card_id": "sv02-269"},
-        {"nombre": "Squirtle (Art Rare)", "set": "151", "precio": "25.00 €", "card_id": "sv3pt5-170"},
-        {"nombre": "Bulbasaur (Art Rare)", "set": "151", "precio": "22.00 €", "card_id": "sv3pt5-166"}
+        {"nombre": "Squirtle (Art Rare)", "set": "151", "precio": "25.00 €", "card_id": "me01-170"},
+        {"nombre": "Bulbasaur (Art Rare)", "set": "151", "precio": "22.00 €", "card_id": "me01-166"}
     ]
 
 @st.cache_data(ttl=3600)
 def obtener_gangas_cardmarket():
     return [
-        {"nombre": "Zapdos ex (Special Art)", "set": "151", "precio": "11.20 €", "card_id": "sv3pt5-202"},
-        {"nombre": "Alakazam ex (Special Art)", "set": "151", "precio": "9.50 €", "card_id": "sv3pt5-201"},
-        {"nombre": "Erika's Invitation", "set": "151", "precio": "14.00 €", "card_id": "sv3pt5-196"},
+        {"nombre": "Zapdos ex (Special Art)", "set": "151", "precio": "11.20 €", "card_id": "me01-202"},
+        {"nombre": "Alakazam ex (Special Art)", "set": "151", "precio": "9.50 €", "card_id": "me01-201"},
+        {"nombre": "Erika's Invitation", "set": "151", "precio": "14.00 €", "card_id": "me01-196"},
         {"nombre": "Arceus VSTAR", "set": "Crown Zenith", "precio": "58.00 €", "card_id": "swsh12pt5-GG70"},
         {"nombre": "Giratina V (Alt Art)", "set": "Lost Origin", "precio": "210.00 €", "card_id": "swsh11-186"},
-        {"nombre": "Snorlax (Illustration)", "set": "151", "precio": "15.00 €", "card_id": "sv3pt5-181"},
-        {"nombre": "Blastoise ex (Special Art)", "set": "151", "precio": "45.00 €", "card_id": "sv3pt5-200"},
-        {"nombre": "Venusaur ex (Special Art)", "set": "151", "precio": "40.00 €", "card_id": "sv3pt5-198"}
+        {"nombre": "Snorlax (Illustration)", "set": "151", "precio": "15.00 €", "card_id": "me01-181"},
+        {"nombre": "Blastoise ex (Special Art)", "set": "151", "precio": "45.00 €", "card_id": "me01-200"},
+        {"nombre": "Venusaur ex (Special Art)", "set": "151", "precio": "40.00 €", "card_id": "me01-198"}
     ]
 
 # -----------------------------------------------------------------------------
@@ -123,22 +123,27 @@ def obtener_peso_rareza(card_detail):
     return 0
 
 def obtener_detalle_carta(card_id, lang_code):
-    """Consulta la carta y si falla o no existe en el idioma elegido, usa inglés de respaldo (Fallback)."""
-    try:
-        res = requests.get(f"https://api.tcgdex.net/v2/{lang_code}/cards/{card_id}", timeout=3)
-        if res.status_code == 200:
-            return res.json()
-    except Exception:
-        pass
+    """Prueba múltiples variaciones de ID si es necesario para evitar errores 404."""
+    variantes_id = [card_id]
     
-    # Intento de respaldo en inglés si falla en español/asíatico
-    try:
-        res_en = requests.get(f"https://api.tcgdex.net/v2/en/cards/{card_id}", timeout=3)
-        if res_en.status_code == 200:
-            return res_en.json()
-    except Exception:
-        pass
-        
+    # Si el ID pertenece a 151, intentamos con alias conocidos de TCGdex
+    if "me01-" in card_id:
+        num = card_id.split("-")[-1]
+        variantes_id.append(f"sv03pt5-{num}")
+        variantes_id.append(f"sv3pt5-{num}")
+    elif "sv3pt5-" in card_id or "sv03pt5-" in card_id:
+        num = card_id.split("-")[-1]
+        variantes_id.append(f"me01-{num}")
+
+    for cid in variantes_id:
+        for lang in [lang_code, "en", "es"]:
+            try:
+                res = requests.get(f"https://api.tcgdex.net/v2/{lang}/cards/{cid}", timeout=3)
+                if res.status_code == 200:
+                    return res.json()
+            except Exception:
+                pass
+
     return None
 
 def get_spanish_nm_price(card_name, card_number):
@@ -224,7 +229,7 @@ with tab_buscar:
 
         card_details = None
 
-        # A) Carga directa con Fallback Anti-Bloqueos
+        # A) Carga directa
         if direct_id:
             with st.spinner("Cargando carta seleccionada..."):
                 card_details = obtener_detalle_carta(direct_id, lang_code)
