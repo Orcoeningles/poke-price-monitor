@@ -40,7 +40,7 @@ def agregar_a_favoritos(card_id, card_name, price_to_save, img_url, set_info):
         favoritos[card_id]["precio_ultimo"] = price_to_save
         favoritos[card_id]["fecha_ultima"] = fecha_actual
         favoritos[card_id]["set_info"] = set_info
-        if not favoritos[card_id]["historial"] or favoritos[card_id]["historial"][-1]["fecha"] != fecha_actual:
+        if not favoritos[card_id].get("historial") or favoritos[card_id]["historial"][-1]["fecha"] != fecha_actual:
             favoritos[card_id]["historial"].append(nuevo_registro)
     else:
         favoritos[card_id] = {
@@ -63,11 +63,11 @@ def eliminar_de_favoritos(card_id):
         guardar_favoritos(favoritos)
 
 # -----------------------------------------------------------------------------
-# SCRAPING / OBTENCIÓN DEL TOP 20 MÁS VENDIDAS / TENDENCIAS
+# SCRAPING / OBTENCIÓN DEL TOP 20 TENDENCIAS CON SET
 # -----------------------------------------------------------------------------
 @st.cache_data(ttl=3600)
 def obtener_top_20_tendencias_exactas():
-    """Extrae las 20 cartas con mayor tendencia en Cardmarket."""
+    """Extrae las 20 cartas con mayor tendencia en Cardmarket detallando nombre y set."""
     url = "https://www.cardmarket.com/es/Pokemon/Products/Singles"
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
@@ -98,7 +98,7 @@ def obtener_top_20_tendencias_exactas():
     except Exception:
         pass
 
-    # Si falla por Cloudflare, cargamos una lista de respaldo ampliada a 20 cartas
+    # Fallback si Cloudflare bloquea las peticiones desde la nube
     if not top_cards:
         top_cards = [
             {"nombre": "Charizard ex", "set": "Obsidian Flames", "precio": "12.50 €"},
@@ -130,7 +130,7 @@ def obtener_top_20_tendencias_exactas():
 POKEMON_TRANSLATIONS = {
     "cubone": {"zh-cn": "卡拉卡拉", "zh-tw": "卡拉卡拉", "ja": "カラカラ", "ko": "탕구리"},
     "gloom": {"zh-cn": "臭臭花", "zh-tw": "臭臭花", "ja": "クサイハナ", "ko": "냄새꼬"},
-    "pikachu": {"zh-cn": "皮卡丘", "zh-tw": "皮卡丘", "ja": "ピカチュウ", "ko": "皮卡丘"},
+    "pikachu": {"zh-cn": "皮卡丘", "zh-tw": "皮卡丘", "ja": "ピ卡丘", "ko": "피카츄"},
     "charizard": {"zh-cn": "喷火龙", "zh-tw": "噴火龍", "ja": "リザードン", "ko": "리자몽"}
 }
 
@@ -194,68 +194,6 @@ def get_spanish_nm_price(card_name, card_number):
     return None, url
 
 # -----------------------------------------------------------------------------
-# -----------------------------------------------------------------------------
-# -----------------------------------------------------------------------------
-@st.cache_data(ttl=3600)
-def obtener_top_20_tendencias_exactas():
-    """Extrae las 20 cartas con mayor tendencia en Cardmarket detallando nombre y set."""
-    url = "https://www.cardmarket.com/es/Pokemon/Products/Singles"
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-        'Accept-Language': 'es-ES,es;q=0.9'
-    }
-    
-    top_cards = []
-    try:
-        r = requests.get(url, headers=headers, timeout=5)
-        if r.status_code == 200:
-            soup = BeautifulSoup(r.text, 'html.parser')
-            rows = soup.select('.table-body .row')
-            for row in rows[:20]:
-                name_elem = row.select_one('.col-seller, .col-name, a')
-                set_elem = row.select_one('.col-expansion, .expansion-symbol')
-                price_elem = row.select_one('.col-price')
-                
-                if name_elem:
-                    card_title = name_elem.text.strip()
-                    set_title = set_elem.text.strip() if set_elem else ""
-                    price_val = price_elem.text.strip() if price_elem else "N/D"
-                    
-                    top_cards.append({
-                        "nombre": card_title,
-                        "set": set_title,
-                        "precio": price_val
-                    })
-    except Exception:
-        pass
-
-    # Fallback si Cloudflare bloquea las peticiones desde la nube
-    if not top_cards:
-        top_cards = [
-            {"nombre": "Charizard ex", "set": "Obsidian Flames", "precio": "12.50 €"},
-            {"nombre": "Pikachu ex", "set": "Surging Sparks", "precio": "25.00 €"},
-            {"nombre": "Mewtwo ex", "set": "151", "precio": "8.00 €"},
-            {"nombre": "Umbreon VMAX", "set": "Evolving Skies", "precio": "650.00 €"},
-            {"nombre": "Gengar ex", "set": "Temporal Forces", "precio": "15.00 €"},
-            {"nombre": "Gardevoir ex", "set": "Paldean Fates", "precio": "18.00 €"},
-            {"nombre": "Iono", "set": "Paldea Evolved", "precio": "35.00 €"},
-            {"nombre": "Lugia V", "set": "Silver Tempest", "precio": "180.00 €"},
-            {"nombre": "Giratina V", "set": "Lost Origin", "precio": "240.00 €"},
-            {"nombre": "Rayquaza VMAX", "set": "Evolving Skies", "precio": "300.00 €"},
-            {"nombre": "Bulbasaur", "set": "151", "precio": "22.00 €"},
-            {"nombre": "Squirtle", "set": "151", "precio": "25.00 €"},
-            {"nombre": "Charmander", "set": "151", "precio": "30.00 €"},
-            {"nombre": "Blastoise ex", "set": "151", "precio": "45.00 €"},
-            {"nombre": "Venusaur ex", "set": "151", "precio": "40.00 €"},
-            {"nombre": "Eevee", "set": "Twilight Masquerade", "precio": "48.00 €"},
-            {"nombre": "Snorlax", "set": "151", "precio": "15.00 €"},
-            {"nombre": "Arceus VSTAR", "set": "Crown Zenith", "precio": "65.00 €"},
-            {"nombre": "Miriam", "set": "Scarlet & Violet", "precio": "32.00 €"},
-            {"nombre": "Lillie", "set": "Ultra Prism", "precio": "120.00 €"}
-        ]
-    return top_cards
-
-# -----------------------------------------------------------------------------
 # BARRA LATERAL (SIDEBAR): TOP 20 TENDENCIAS
 # -----------------------------------------------------------------------------
 with st.sidebar:
@@ -271,16 +209,19 @@ with st.sidebar:
             
         with st.container():
             if st.button(label, key=f"top_exact_{idx}"):
-                # Guardamos tanto el nombre como el set objetivo para filtrar exactamente esa carta
                 st.session_state["search_input"] = item["nombre"]
                 st.session_state["target_set"] = item["set"]
                 st.rerun()
             st.caption(f"💰 Precio tendencia: **{item['precio']}**")
             st.divider()
+
 # -----------------------------------------------------------------------------
 # INTERFAZ PRINCIPAL
 # -----------------------------------------------------------------------------
 st.title("PokéPrice Monitor 📈")
+
+# DECLARACIÓN DE LAS PESTAÑAS (Esto corrige el NameError)
+tab_buscar, tab_favs = st.tabs(["🔍 Buscar Cartas", "⭐ Mis Favoritos"])
 
 with tab_buscar:
     col_search, col_lang = st.columns([3, 2])
@@ -325,7 +266,7 @@ with tab_buscar:
                 
                 full_details = [c for c in full_details if c is not None]
 
-            # FILTRADO EXACTO: Si se pulso desde el Top 20, filtramos por la expansión elegida
+            # FILTRADO EXACTO SI SE PULSÓ DESDE EL TOP 20
             if target_set:
                 target_clean = target_set.lower().strip()
                 filtered = [
@@ -352,11 +293,10 @@ with tab_buscar:
             selected_id = card_details.get('id')
             selected_name = card_details.get('name')
 
-            # Limpiar el filtro de set tras realizar la carga
+            # Limpiar filtro tras selección
             st.session_state["target_set"] = None
 
             st.divider()
-            # ... resto del código sin cambios (precios, cardmarket, favoritos, etc.) ...
             
             set_data = card_details.get('set', {})
             set_name = set_data.get('name', 'Desconocida')
